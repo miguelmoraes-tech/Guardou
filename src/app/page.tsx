@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { hojeISO } from "@/lib/format";
 import { CardapioCliente } from "@/components/CardapioCliente";
@@ -38,8 +39,11 @@ export default async function Home() {
         <CardapioCliente pratosIniciais={pratos} />
       </main>
 
-      <footer className="pb-8 pt-4 text-center text-xs text-stone-400">
-        feito com 🧡 por Guardou
+      <footer className="flex flex-col items-center gap-2 pb-8 pt-4 text-center text-xs text-stone-400">
+        <p>feito com 🧡 por Guardou</p>
+        <Link href="/login" className="underline-offset-2 hover:underline">
+          É dono de estabelecimento? Acesse aqui
+        </Link>
       </footer>
     </div>
   );
