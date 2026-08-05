@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import { hojeISO } from "@/lib/format";
 import { NovoPratoForm } from "@/components/admin/NovoPratoForm";
 import { PratosList } from "@/components/admin/PratosList";
@@ -19,6 +19,7 @@ export function AdminClient({ pratosIniciais, reservasIniciais }: AdminClientPro
   const [reservas, setReservas] = useState<ReservaComPrato[]>(reservasIniciais);
 
   const recarregar = useCallback(async () => {
+    const supabase = createClient();
     const hoje = hojeISO();
 
     const [{ data: pratosData }, { data: reservasData }] = await Promise.all([
@@ -39,6 +40,7 @@ export function AdminClient({ pratosIniciais, reservasIniciais }: AdminClientPro
   }, []);
 
   useEffect(() => {
+    const supabase = createClient();
     const canal = supabase
       .channel("admin-realtime")
       .on(

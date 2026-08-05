@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import { formatarHorario } from "@/lib/format";
 import type { ReservaComPrato } from "@/lib/types";
 
@@ -20,6 +20,7 @@ export function ReservasList({ reservas, onAlterado }: ReservasListProps) {
 
   async function marcarConcluida(id: string) {
     setProcessando(id);
+    const supabase = createClient();
     await supabase.from("reservas").update({ status: "concluida" }).eq("id", id);
     setProcessando(null);
     onAlterado();

@@ -1,6 +1,9 @@
-import { supabase } from "@/lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-export async function enviarFotoPrato(arquivo: File): Promise<string> {
+export async function enviarFotoPrato(
+  supabase: SupabaseClient,
+  arquivo: File
+): Promise<string> {
   const extensao = arquivo.name.split(".").pop() ?? "jpg";
   const caminho = `${crypto.randomUUID()}.${extensao}`;
 

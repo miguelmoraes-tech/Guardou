@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import { enviarFotoPrato } from "@/lib/upload";
 import { hojeISO } from "@/lib/format";
 import { Spinner } from "@/components/Spinner";
@@ -56,9 +56,10 @@ export function NovoPratoForm({ onCriado }: NovoPratoFormProps) {
 
     setEnviando(true);
     try {
+      const supabase = createClient();
       let fotoUrl: string | null = null;
       if (foto) {
-        fotoUrl = await enviarFotoPrato(foto);
+        fotoUrl = await enviarFotoPrato(supabase, foto);
       }
 
       const { error } = await supabase.from("pratos_do_dia").insert({

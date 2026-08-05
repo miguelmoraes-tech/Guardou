@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import { formatarPreco, pratoEsgotado, unidadesRestantes } from "@/lib/format";
 import type { PratoDoDia } from "@/lib/types";
 
@@ -15,6 +15,7 @@ export function PratosList({ pratos, onAlterado }: PratosListProps) {
 
   async function marcarEsgotado(prato: PratoDoDia) {
     setProcessando(prato.id);
+    const supabase = createClient();
     await supabase
       .from("pratos_do_dia")
       .update({ quantidade_reservada: prato.quantidade_total })
@@ -25,6 +26,7 @@ export function PratosList({ pratos, onAlterado }: PratosListProps) {
 
   async function desativar(prato: PratoDoDia) {
     setProcessando(prato.id);
+    const supabase = createClient();
     await supabase.from("pratos_do_dia").update({ ativo: false }).eq("id", prato.id);
     setProcessando(null);
     onAlterado();
