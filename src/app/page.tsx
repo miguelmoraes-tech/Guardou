@@ -1,50 +1,35 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { hojeISO } from "@/lib/format";
-import { CardapioCliente } from "@/components/CardapioCliente";
-import type { PratoDoDia } from "@/lib/types";
 
-export const revalidate = 0;
-
-async function buscarPratosDeHoje(): Promise<PratoDoDia[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("pratos_do_dia")
-    .select("*")
-    .eq("data", hojeISO())
-    .eq("ativo", true)
-    .order("created_at", { ascending: true });
-
-  return (data as PratoDoDia[]) ?? [];
-}
-
-export default async function Home() {
-  const pratos = await buscarPratosDeHoje();
-
+export default function Home() {
   return (
-    <div className="min-h-screen bg-orange-50/40">
-      <header className="bg-gradient-to-br from-orange-600 to-red-600 px-4 pb-8 pt-10 text-white shadow-md">
-        <div className="mx-auto max-w-5xl">
-          <p className="text-sm font-semibold uppercase tracking-wide text-orange-100">
-            Cardápio de hoje
-          </p>
-          <h1 className="mt-1 text-3xl font-extrabold">🍲 Guardou</h1>
-          <p className="mt-2 max-w-md text-orange-50">
-            Reserve seu prato agora e evite fila — pague só na retirada.
-          </p>
-        </div>
-      </header>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-orange-50/40 px-4 py-10">
+      <div className="flex flex-col items-center gap-1 text-center">
+        <span className="text-5xl">🍲</span>
+        <h1 className="mt-1 text-3xl font-extrabold text-stone-800">Guardou</h1>
+        <p className="mt-1 max-w-xs text-stone-500">
+          Reserve o prato do dia sem fila, direto pelo celular.
+        </p>
+      </div>
 
-      <main className="mx-auto max-w-5xl px-4 py-6">
-        <CardapioCliente pratosIniciais={pratos} />
-      </main>
-
-      <footer className="flex flex-col items-center gap-2 pb-8 pt-4 text-center text-xs text-stone-400">
-        <p>feito com 🧡 por Guardou</p>
-        <Link href="/login" className="underline-offset-2 hover:underline">
-          É dono de estabelecimento? Acesse aqui
+      <div className="mt-10 flex w-full max-w-sm flex-col gap-4">
+        <Link
+          href="/cardapio"
+          className="flex flex-col items-center gap-1 rounded-2xl bg-orange-600 px-6 py-6 text-center text-white shadow-sm transition hover:bg-orange-700 active:scale-[0.98]"
+        >
+          <span className="text-2xl">🥡</span>
+          <span className="text-lg font-bold">Sou Cliente</span>
+          <span className="text-sm text-orange-100">quero reservar um prato</span>
         </Link>
-      </footer>
+
+        <Link
+          href="/admin"
+          className="flex flex-col items-center gap-1 rounded-2xl bg-white px-6 py-6 text-center shadow-sm ring-1 ring-black/5 transition hover:bg-stone-50 active:scale-[0.98]"
+        >
+          <span className="text-2xl">🏪</span>
+          <span className="text-lg font-bold text-stone-800">Sou Estabelecimento</span>
+          <span className="text-sm text-stone-500">quero gerenciar o cardápio</span>
+        </Link>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { hojeISO } from "@/lib/format";
 import { AdminClient } from "@/components/admin/AdminClient";
-import { LogoutButton } from "@/components/admin/LogoutButton";
 import type { PratoDoDia, ReservaComPrato } from "@/lib/types";
 
 export const revalidate = 0;
@@ -42,7 +42,12 @@ export default async function AdminPage() {
             </p>
             <h1 className="mt-1 text-2xl font-extrabold">🍲 Guardou · Admin</h1>
           </div>
-          <LogoutButton />
+          <Link
+            href="/"
+            className="rounded-lg bg-white/10 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-white/20"
+          >
+            ← Voltar
+          </Link>
         </div>
       </header>
 

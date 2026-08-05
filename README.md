@@ -4,13 +4,15 @@ MVP para lanchonetes reservarem o prato do dia sem fila. Cliente reserva pelo
 celular (via link/QR code no balcão), a lanchonete gerencia tudo pelo painel
 `/admin`.
 
-- **Cliente** (`/`): vê o cardápio de hoje, reserva um prato com nome,
-  telefone, tipo de entrega e horário. Atualiza em tempo real conforme outras
-  pessoas reservam.
+- **Home** (`/`): tela de escolha — "Sou Cliente" ou "Sou Estabelecimento".
+- **Cliente** (`/cardapio`): vê o cardápio de hoje, reserva um prato com
+  nome, telefone, tipo de entrega e horário. Identificação leve (nome +
+  telefone salvos no navegador, sem senha) na primeira reserva. Atualiza em
+  tempo real conforme outras pessoas reservam.
 - **Admin** (`/admin`): cadastra pratos do dia (com foto), marca pratos como
-  esgotados/desativados, e acompanha/conclui as reservas do dia. Protegido
-  por login (Supabase Auth) — veja `RESUMO.md` pro email/senha do usuário
-  de teste.
+  esgotados/desativados, e acompanha/conclui as reservas do dia. **Sem login
+  no momento** — é uma simplificação pra demo, ver aviso de segurança
+  abaixo.
 - **QR code** (`/qrcode`): página pronta pra imprimir, com QR apontando pra
   home. Também existe um PNG em [`public/qrcode-cardapio.png`](public/qrcode-cardapio.png)
   gerado via `npm run qrcode`.
@@ -23,28 +25,23 @@ Storage + Realtime).
 ## 1. Criar o projeto no Supabase
 
 1. Crie um projeto em [supabase.com](https://supabase.com) (grátis).
-2. Em **SQL Editor**, cole e rode o conteúdo de
-   [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql).
-   Isso cria as tabelas `pratos_do_dia` e `reservas`, a função `reservar_prato`
-   (reserva atômica, sem race condition — testada com Postgres real via
-   PGlite, veja `RESUMO.md`), habilita Realtime nas duas tabelas e cria o
-   bucket público `pratos` no Storage.
-3. Em seguida, cole e rode
-   [`supabase/migrations/0002_auth_e_rls.sql`](supabase/migrations/0002_auth_e_rls.sql)
-   — restringe escrita em `pratos_do_dia`/`reservas` e no Storage a usuários
-   autenticados (só o admin logado), mantendo leitura do cardápio e criação
-   de reserva públicas. Detalhes de cada policy e por que a RPC virou
-   `SECURITY DEFINER` estão no `RESUMO.md`.
-4. (Opcional, recomendado para a demo) Rode também
+2. Em **SQL Editor**, rode em ordem:
+   - [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql)
+     — tabelas `pratos_do_dia`/`reservas`, função `reservar_prato` (reserva
+     atômica, testada com Postgres real via PGlite — veja `RESUMO.md`),
+     Realtime, bucket público `pratos` no Storage.
+   - [`supabase/migrations/0003_reverter_rls_para_demo.sql`](supabase/migrations/0003_reverter_rls_para_demo.sql)
+     — mantém escrita pública em tudo (sem exigir login), do jeito que a
+     demo de amanhã precisa. **Pule a `0002_auth_e_rls.sql`** por enquanto
+     (ela existe no repo, mas foi revertida pela `0003` — só volte a
+     rodá-la quando for reativar autenticação de verdade, veja o aviso
+     abaixo).
+3. (Opcional, recomendado para a demo) Rode também
    [`supabase/seed.sql`](supabase/seed.sql) no SQL Editor — cadastra 3 pratos
    de exemplo já cobrindo os três estados de card: disponível, quase
    esgotado e esgotado.
-5. Em **Project Settings > API**, copie a **Project URL** e a **anon public
+4. Em **Project Settings > API**, copie a **Project URL** e a **anon public
    key**.
-6. Crie o usuário do dono da lanchonete (login de `/admin`): Dashboard →
-   **Authentication → Users → Add user**, marcando "Auto Confirm User". Email
-   e senha sugeridos estão no `RESUMO.md`. (Alternativa: rodar
-   `SUPABASE_SERVICE_ROLE_KEY=... node scripts/criar-admin.mjs`.)
 
 ## 2. Configurar variáveis de ambiente
 
@@ -67,7 +64,8 @@ npm install
 npm run dev
 ```
 
-Abra [http://localhost:3000](http://localhost:3000) (cliente),
+Abra [http://localhost:3000](http://localhost:3000) (escolha de perfil),
+[http://localhost:3000/cardapio](http://localhost:3000/cardapio) (cliente),
 [http://localhost:3000/admin](http://localhost:3000/admin) (painel) e
 [http://localhost:3000/qrcode](http://localhost:3000/qrcode) (cartaz pra
 imprimir).
@@ -76,21 +74,37 @@ imprimir).
 
 1. Rode `supabase/seed.sql` (passo 1.3 acima) pra já ter 3 pratos com foto
    nos três estados (disponível / quase esgotado / esgotado).
-2. Abra `/` e mostre os três cards — o esgotado já aparece com botão
-   desabilitado.
-3. Faça uma reserva no prato "quase esgotado" e mostre a tela de confirmação.
-4. Abra `/admin` em outra aba: a reserva aparece na lista, e o prato agora
-   está esgotado — mostre o card em `/` atualizando sozinho via Realtime.
-5. Marque a reserva como "concluída" no admin.
+2. Abra `/` e mostre a escolha de perfil.
+3. Clique em "Sou Cliente" → mostre os três cards, o esgotado já aparece com
+   botão desabilitado.
+4. Faça uma reserva no prato "quase esgotado" e mostre a tela de confirmação.
+5. Volte em `/` → "Sou Estabelecimento" → `/admin`: a reserva aparece na
+   lista, e o prato agora está esgotado — mostre o card em `/cardapio`
+   atualizando sozinho via Realtime.
+6. Marque a reserva como "concluída" no admin. Botão "← Voltar" leva de
+   volta pra escolha de perfil.
 
-## Sobre segurança (RLS)
+## ⚠️ Sobre segurança (RLS e autenticação)
 
-Desde a `0002_auth_e_rls.sql`, RLS está habilitado: leitura do cardápio e
-criação de reserva continuam públicas (o cliente nunca faz login), mas
-qualquer escrita em `pratos_do_dia`/`reservas` (exceto o insert de reserva)
-exige uma sessão autenticada — é o dono da lanchonete logado em `/admin`.
-Ainda é single-tenant (um usuário só, sem multi-loja) — RLS por
-`estabelecimento_id` fica pra quando isso for necessário.
+**Estado atual (demo):** `/admin` não exige login — é só separação visual
+de papéis na home. RLS está desabilitada, escrita em `pratos_do_dia` e
+`reservas` é pública (migration `0003_reverter_rls_para_demo.sql`). Isso é
+aceitável **só** nesse contexto controlado de demo/apresentação.
+
+**Antes de usar isso com uma lanchonete de verdade**, reative a
+autenticação:
+1. Rode `supabase/migrations/0002_auth_e_rls.sql` (ou uma versão
+   atualizada dela) de novo.
+2. Restaure `src/proxy.ts` protegendo `/admin/:path*` — o arquivo ainda
+   existe no histórico do git (removido nesta rodada), ou recrie a partir
+   do padrão `@supabase/ssr` + `createServerClient` + `auth.getUser()`.
+3. Linke `/login` de volta em algum lugar visível (a página continua no
+   repo, só não está linkada agora) e troque o botão "← Voltar" do admin
+   por um botão "Sair" (componente `LogoutButton.tsx`, também preservado).
+4. O usuário `dono@guardou.app` no Supabase Auth não foi apagado — só
+   troque a senha antes de usar de verdade.
+
+Detalhes completos de cada mudança estão no `RESUMO.md`.
 
 ## Deploy
 
