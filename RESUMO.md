@@ -1,16 +1,209 @@
 # Resumo — Guardou MVP pronto para demo
 
-Atualizado em 2026-08-04, à noite — deploy de produção finalizado.
+Atualizado em 2026-08-04 — autenticação adicionada (login do admin +
+identificação leve do cliente + RLS restritiva).
 
 ## 🚀 URL de produção
 
 **https://guardou.vercel.app**
 
-Confirmado no ar: `/`, `/admin` e `/qrcode` respondem HTTP 200 e carregam
-dados reais do seu projeto Supabase (o card "Frango grelhado, arroz, feijão
-e salada" já aparece renderizado no HTML retornado pela Vercel).
+⚠️ **Ainda não fiz o deploy desta rodada de mudanças** (auth/RLS) — só
+implementei, testei a lógica de banco via PGlite e commitei localmente.
+Você precisa rodar a migration nova no Supabase **antes** de dar push, ou
+o `/admin` em produção vai ficar inacessível (RLS bloqueando sem o login
+funcionando ainda). Passo a passo completo na seção 3.
 
-## 1. Status de cada etapa do deploy
+## 🔑 Login do admin
+
+| | |
+|---|---|
+| URL | `/login` (redireciona sozinho se você tentar `/admin` sem sessão) |
+| Email sugerido | `dono@guardou.app` |
+| Senha sugerida | `Guardou@2026` |
+
+**Eu não criei esse usuário no seu projeto Supabase** — não tenho a
+service role key nem a senha do banco, só a anon key (e olha lá: tentei
+puxar via `vercel env pull` pra ao menos conferir, mas você marcou as
+variáveis como "Sensitive" na Vercel, então nem a CLI consegue ler o
+valor de volta). Duas formas de criar, na seção 3.
+
+Se preferir outro email/senha, é só usar o que você quiser na hora de
+criar — não tem nada fixo no código, esses são só valores sugeridos.
+
+## 1. O que foi implementado nesta rodada
+
+### Login do estabelecimento — autenticação real
+- Troquei o client único do supabase-js por dois clients via
+  `@supabase/ssr`: [`src/lib/supabase/client.ts`](src/lib/supabase/client.ts)
+  (browser) e [`src/lib/supabase/server.ts`](src/lib/supabase/server.ts)
+  (Server Components) — sessão viaja em cookies, compartilhada entre os
+  dois.
+- [`src/proxy.ts`](src/proxy.ts) protege `/admin/:path*`: sem sessão
+  válida, redireciona pra `/login`. Nomeei o arquivo `proxy.ts` (não
+  `middleware.ts`) porque o Next.js 16 depreciou a convenção antiga
+  durante essa sessão — o build mostrava um aviso `"middleware" file
+  convention is deprecated`, então já migrei pro nome novo (`proxy.ts` +
+  `export async function proxy(...)`), mesmo comportamento.
+- Se a chamada ao Supabase Auth falhar (rede fora do ar, credenciais
+  erradas), o proxy trata como **deslogado** — falha fechada, nunca deixa
+  passar pro admin só porque o Supabase não respondeu.
+- `/login` ([`src/app/login/page.tsx`](src/app/login/page.tsx)): formulário
+  de email/senha, chama `signInWithPassword`, erro genérico "Email ou
+  senha inválidos" (não revela se o email existe).
+- Botão "Sair" no header do admin
+  ([`LogoutButton.tsx`](src/components/admin/LogoutButton.tsx)): chama
+  `signOut()` e redireciona pra `/login`.
+- Todos os componentes do admin (formulário de novo prato, listas de
+  pratos/reservas, upload de foto) migraram pro client autenticado — sem
+  isso, as escritas cairiam na RLS nova mesmo com o usuário logado.
+
+### Identificação do cliente — leve, sem senha
+- [`src/lib/clienteIdentidade.ts`](src/lib/clienteIdentidade.ts): salva
+  `{ nome, telefone }` no `localStorage` (chave `guardou:cliente`), nada de
+  conta/senha/confirmação por SMS ou email.
+- Ao clicar "Reservar" pela primeira vez, aparece
+  [`IdentificacaoModal`](src/components/IdentificacaoModal.tsx) — "Como
+  podemos te chamar?" — só nome e celular. Depois disso, o formulário de
+  reserva já abre pré-preenchido.
+- Link discreto "Não é você? Preencher com outros dados" dentro do
+  formulário de reserva (só aparece quando os campos vieram pré-
+  preenchidos) — limpa o localStorage e os campos ficam em branco pra
+  digitar de novo. Ao concluir a próxima reserva, o que for digitado é
+  salvo de novo.
+
+### RLS mais restritiva + RPC virou SECURITY DEFINER
+Migration [`supabase/migrations/0002_auth_e_rls.sql`](supabase/migrations/0002_auth_e_rls.sql).
+Antes disso, RLS estava desabilitado (escrita pública em tudo). Agora:
+
+| Tabela | Ação | Quem pode |
+|---|---|---|
+| `pratos_do_dia` | select | público (`anon` + `authenticated`) |
+| `pratos_do_dia` | insert/update/delete | só `authenticated` (`auth.uid() is not null`) |
+| `reservas` | insert | público (cliente reserva sem login) |
+| `reservas` | select/update/delete | só `authenticated` |
+| `storage.objects` (bucket `pratos`) | select | público |
+| `storage.objects` (bucket `pratos`) | insert/update | só `authenticated` |
+
+Duas decisões que vale você revisar:
+- **Restringi `select` de `reservas` pro admin só** — não foi pedido
+  explicitamente, mas o pedido original já dizia "só o admin deve poder
+  mudar status de reserva"; deixar `select` público significaria qualquer
+  pessoa conseguir ler nome/telefone de todos os clientes que reservaram,
+  então travei leitura também por privacidade.
+- **Restringi upload/update do Storage** pelo mesmo raciocínio do
+  `pratos_do_dia` — não foi pedido, mas deixar o bucket com upload público
+  enquanto a tabela ficava travada seria a mesma falha de segurança
+  disfarçada (qualquer um subir arquivo arbitrário pro bucket via API,
+  sem passar pela UI).
+
+**A função `reservar_prato` precisou virar `SECURITY DEFINER`** — ela faz
+`UPDATE` em `pratos_do_dia` (incrementar `quantidade_reservada`), e isso
+agora exige `authenticated`. Só que quem reserva é o cliente anônimo. Com
+`SECURITY DEFINER`, a função roda com o privilégio de quem é dona dela
+(o role de migração, que ignora RLS), então o cliente continua reservando
+normalmente — mas esse é o **único** caminho de escrita que sobra pra ele,
+e a função já valida tudo (esgotado, prato inexistente, tipo de entrega)
+antes de gravar. Adicionei `set search_path = public` na função, prática
+recomendada de segurança pra função `SECURITY DEFINER` (evita hijack de
+search_path).
+
+### Testei tudo isso com Postgres real (PGlite), de novo
+Mesma abordagem da rodada anterior (sem Docker/projeto Supabase real
+disponível aqui): criei roles `anon` e `authenticated` de verdade dentro
+do PGlite, um stub de `auth.uid()` lendo uma GUC de sessão, apliquei a
+migration inteira e testei 15 cenários — todos passando:
+
+- `anon` lê `pratos_do_dia`, mas **não** consegue insert/update/delete
+  diretos (permission denied).
+- `anon` **não** consegue `select` em `reservas`.
+- `anon` consegue `insert` direto em `reservas` (fluxo público preservado).
+- `anon` **não** consegue `update` em `reservas`.
+- `anon` reserva com sucesso via `reservar_prato` (RPC) mesmo sem nenhum
+  grant direto — confirma que o `SECURITY DEFINER` funciona.
+- RPC ainda rejeita corretamente prato esgotado após o refactor.
+- `authenticated` consegue insert/update/delete em `pratos_do_dia` e em
+  `reservas` sem restrição.
+
+(Achei e corrigi dois bugs no *script de teste* nesse processo — não na
+migration: eu tinha usado `grant ... to public` em vez de `to anon,
+authenticated` no setup base, e `set_config(..., true)` (transação local)
+em vez de `false` (sessão), o que fazia o "usuário logado" simulado
+resetar entre queries. Corrigido, todos os 15 testes passaram limpos.)
+
+## 2. O que ainda depende de você
+
+Sem service role key, sem senha do banco Postgres, sem Supabase CLI
+logada e sem Docker neste ambiente, não consigo:
+
+1. **Rodar a migration `0002_auth_e_rls.sql` no seu projeto real.**
+2. **Criar o usuário admin de verdade.** Duas opções:
+   - **Dashboard (mais simples)**: Supabase → Authentication → Users →
+     Add user → email `dono@guardou.app`, senha `Guardou@2026` (ou as
+     suas escolhas), marcar **Auto Confirm User**.
+   - **Script**: `SUPABASE_SERVICE_ROLE_KEY=sua-chave node
+     scripts/criar-admin.mjs dono@guardou.app "Guardou@2026"` (a service
+     role key fica só na sua máquina, no comando — não é salva em
+     nenhum arquivo do projeto).
+3. **Testar o login de verdade** contra o Supabase real — só validei o
+   *comportamento do proxy* localmente (redirecionamento funcionando com
+   credenciais placeholder), não o fluxo de login completo.
+4. **Dar push e redeployar** — ver checklist exato na seção 3.
+
+## 3. Passo a passo pra você (nesta ordem — importante)
+
+1. No SQL Editor do Supabase, rode
+   `supabase/migrations/0002_auth_e_rls.sql`.
+2. Crie o usuário admin (uma das duas formas acima).
+3. Teste local antes de subir:
+   ```bash
+   npm run dev
+   ```
+   - Abra `/admin` deslogado → deve cair em `/login`.
+   - Faça login com o usuário criado → deve entrar no admin.
+   - Cadastre um prato, marque uma reserva como concluída.
+   - Clique em "Sair" → deve voltar pra `/login`.
+   - Abra `/` numa aba anônima e confirme que reservar continua
+     funcionando **sem login nenhum** (pede nome/telefone uma vez só, no
+     modal de identificação).
+4. Se tudo funcionar local, `git push origin main` — como o projeto Vercel
+   está conectado ao GitHub, isso dispara o deploy sozinho.
+5. Depois do deploy, repita o teste do passo 3 em
+   `https://guardou.vercel.app` (login, cadastro de prato, reserva sem
+   login).
+
+Se pular o passo 1 (migration) antes de testar em produção, o `/admin` vai
+carregar mas as leitura/escrita de `reservas`/`pratos_do_dia` vão falhar
+silenciosamente (RLS antiga ainda liberada, mas o client novo já espera
+cookies de sessão) — então a ordem importa.
+
+## 4. Decisões de design/UX tomadas sozinho (revisão pendente sua)
+
+- **Email/senha do admin escolhidos por mim**: `dono@guardou.app` /
+  `Guardou@2026` — troque à vontade, não tem nada fixo no código.
+- **Erro de login genérico** ("Email ou senha inválidos"), sem dizer se o
+  email existe — prática padrão de segurança pra não ajudar quem está
+  tentando adivinhar contas.
+- **Identificação do cliente como modal separado**, não reaproveitando os
+  campos nome/telefone que já existiam no formulário de reserva — achei
+  que descolar "quem é você" de "detalhes desse pedido" ficou mais fiel ao
+  pedido ("antes de fazer a primeira reserva... peça nome e telefone em
+  uma tela simples"), mesmo que tecnicamente desse pra só pré-preencher os
+  campos existentes.
+- **`select` de `reservas` e upload de Storage restritos ao admin**: não
+  foi pedido explicitamente, expliquei o raciocínio de segurança na seção
+  1 — reverta se preferir manter público.
+- **`reservar_prato` como `SECURITY DEFINER`**: única forma de manter o
+  cliente reservando sem login depois de travar `UPDATE` em
+  `pratos_do_dia` pra só-autenticado. Sem isso, a RLS nova quebraria o
+  fluxo de reserva inteiro.
+- **`proxy.ts` em vez de `middleware.ts`**: o Next 16 (versão que este
+  projeto usa) deprecou a convenção `middleware` durante esta própria
+  sessão de trabalho — migrei direto pro nome novo pra não entregar código
+  já com aviso de depreciação.
+
+## 5. Histórico — deploy inicial (sessão anterior, ainda válido)
+
+### Status de cada etapa do deploy
 
 | Etapa | Status |
 |---|---|
@@ -18,109 +211,27 @@ e salada" já aparece renderizado no HTML retornado pela Vercel).
 | Push pro GitHub (`miguelmoraes-tech/Guardou`, branch `main`) | ✅ |
 | Projeto Vercel linkado (`.vercel/project.json`) | ✅ |
 | Deploy de produção | ✅ `https://guardou.vercel.app` |
-| Variáveis de ambiente na Vercel | ✅ (você já tinha adicionado as duas do Supabase; eu adicionei a terceira, ver nota abaixo) |
+| Variáveis de ambiente na Vercel | ✅ |
 | QR code apontando pra URL final | ✅ `public/qrcode-cardapio.png` e `/qrcode` |
 | Teste HTTP de produção | ✅ sem erro de env var, HTML esperado |
-| Teste manual no celular | ⏳ **precisa de você**, veja seção 4 |
 
-### O que eu fiz nesta rodada
+O deploy inicial (sem auth) foi testado e confirmado no ar — veja o
+histórico de commits pra detalhes de como o link Vercel/GitHub foi feito,
+como a env var `NEXT_PUBLIC_SITE_URL` foi adicionada, e como o QR code foi
+regenerado com a URL final. Resumo condensado porque a rodada de auth
+desta sessão é o que precisa da sua atenção agora.
 
-1. **Verifiquei o estado do git**: working tree limpo, `origin` já apontava
-   pro repo `miguelmoraes-tech/Guardou` (confirmei que ele existe e está
-   acessível com `git ls-remote`, mesmo vazio).
-2. **Não havia projeto Vercel linkado localmente** (`.vercel/project.json`
-   não existia), mas a Vercel CLI já estava autenticada (você deve ter
-   completado o login que eu tinha deixado pendente) e já existia um
-   projeto chamado `guardou` no seu dashboard (criado ~3 min antes, sem
-   deploy ainda — provavelmente quando você foi adicionar as env vars). Eu
-   linkei o diretório local a esse projeto existente com `vercel link
-   --yes --project guardou`, sem criar um projeto novo.
-3. **Dei `git push -u origin main`** — 8 commits organizados foram pro
-   GitHub.
-4. **O push já disparou o deploy sozinho** (o projeto Vercel estava
-   conectado ao repositório do GitHub) — por isso eu **não** rodei `vercel
-   --prod` na primeira vez, só acompanhei com `vercel inspect --wait` até
-   o status ficar `Ready`.
-5. **Testei as 3 rotas com curl** contra `https://guardou.vercel.app` —
-   todas 200, HTML sem mensagem de erro, e a home já mostrando prato real
-   do seu banco.
-6. **Achei um problema**: `NEXT_PUBLIC_SITE_URL` não estava configurada na
-   Vercel (você tinha adicionado só as duas do Supabase, como avisado), então
-   a página `/qrcode` estava gerando o QR apontando pra `localhost:3000` em
-   produção. Corrigi adicionando a variável via `vercel env add
-   NEXT_PUBLIC_SITE_URL production --value "https://guardou.vercel.app"`.
-7. Como variáveis `NEXT_PUBLIC_*` são embutidas no HTML/JS **no momento do
-   build**, só adicionar a env var não mudava o que já estava no ar — rodei
-   **um segundo deploy** (`vercel --prod`) pra rebuildar com o valor certo.
-   Esse é o único `vercel --prod` manual que rodei, e foi necessário (não
-   duplicou nada — confirmei com `vercel ls` que ficaram só os deploys
-   esperados, todos `Ready`).
-8. Confirmei via curl que `/qrcode` em produção agora contém
-   `guardou.vercel.app`, não mais `localhost`.
-9. Regenerei `public/qrcode-cardapio.png` localmente com
-   `npm run qrcode https://guardou.vercel.app`, commitei e dei push — isso
-   disparou um 3º deploy automático (esperado, é só a atualização do PNG).
-   Confirmei que o PNG novo responde 200 em produção.
-
-## 2. O que ainda depende de você
-
-- **Testar no celular de verdade** (a rede/HTTPS/câmera pra ler QR code só
-  dá pra confirmar num aparelho físico) — passo a passo na seção 4.
-- Os 3 pratos de exemplo em produção são os do `supabase/seed.sql` — se
-  você já rodou esse script no seu projeto Supabase, ótimo; se editou os
-  dados manualmente pelo `/admin`, é isso que vai aparecer na demo (confira
-  se está do jeito que você quer antes da apresentação).
-- Se quiser trocar as fotos placeholder do Unsplash por fotos reais dos
-  pratos, use o `/admin` pra recadastrar ou editar direto no Supabase.
-
-## 3. Testes que rodei antes deste deploy (sessão anterior, ainda válidos)
-
-Sem Docker/Supabase local disponível neste ambiente, validei a lógica mais
-crítica (a função `reservar_prato`) rodando o schema inteiro contra um
-Postgres real via PGlite (WASM, não ficou como dependência do projeto):
-reservar até esgotar (sem race condition, graças ao `FOR UPDATE`), rejeição
+### Testes de banco (RPC `reservar_prato`, sem auth) — sessão anterior
+Validei reservar até esgotar (sem race condition, `FOR UPDATE`), rejeição
 de prato esgotado/inexistente/desativado/tipo de entrega inválido, e
-confirmação de que chamadas rejeitadas não deixam registro parcial. Detalhes
-e mais contexto de UI (spinners, validação, guarda contra duplo clique)
-seguem valendo — não mudou nada nessa área nesta rodada.
+confirmação de que chamadas rejeitadas não deixam registro parcial — tudo
+via PGlite. Continua válido; a função só ganhou `SECURITY DEFINER` nesta
+rodada, a lógica de negócio interna não mudou (reconfirmei isso nos 15
+testes novos).
 
-## 4. Passo a passo pra você testar no celular
-
-1. Abra **https://guardou.vercel.app** no celular (ou escaneie o QR em
-   `/qrcode` no computador, ou imprima `public/qrcode-cardapio.png`).
-2. Confira se os pratos aparecem certinho: foto, nome, preço, "restantes"
-   ou "Esgotado".
-3. Toque em "Reservar" num prato disponível → preencha nome, celular
-   (a máscara `(11) 91234-5678` deve aparecer sozinha conforme digita),
-   escolha "Retirar" ou "Comer no local", escolha um horário entre 11h e
-   14h → "Confirmar reserva".
-4. Confira a tela de confirmação: "Reserva feita! Pegue às [horário] —
-   apresente seu nome no balcão."
-5. Em outra aba/dispositivo, abra **https://guardou.vercel.app/admin** e
-   confira que a reserva apareceu na lista "Reservas de hoje", com o
-   telefone certo.
-6. Volte pra `/` (pode ser a mesma aba do celular, sem recarregar) e
-   confira que o número de "restantes" no card diminuiu sozinho (Realtime).
-7. No admin, clique em "Marcar concluída" na reserva.
-8. Tente reservar um prato que já está "Esgotado" — o botão deve estar
-   desabilitado e não deixar nem abrir o formulário.
-
-## 5. Decisões de design/UX tomadas sozinho (revisão pendente sua)
-
-- **Cores**: laranja/vermelho (`orange-600`/`red-600`) + tons terrosos
-  (`stone-*`) — troque se a lanchonete tiver identidade visual própria.
-- **"Marcar esgotado" vs "Desativar" no admin**: são ações separadas —
-  "esgotado" só trava a quantidade, "desativar" tira o prato da lista do
-  dia inteiramente.
-- **Telefone exige 11 dígitos** (celular com DDD): pode recusar número fixo
-  de 10 dígitos, escolhi assim porque o pedido original especificava
-  "máscara de celular BR".
-- **Realtime + poll de 15s como fallback**: se o Realtime cair por algum
-  motivo na hora da demo, a lista ainda atualiza sozinha em até 15s.
-- **Fotos placeholder do Unsplash**: escolhidas por semelhança visual, não
-  são fotos reais dos pratos da lanchonete.
-- **`NEXT_PUBLIC_SITE_URL` adicionada por mim direto na Vercel**: é uma
-  variável pública (não é segredo — vai parar no HTML mesmo), então achei
-  seguro adicionar sozinho pra destravar o QR code sem precisar te
-  interromper. As duas variáveis do Supabase eu não mexi, ficaram como você
-  configurou.
+### Decisões de design da rodada anterior
+Cores laranja/vermelho, "Marcar esgotado" vs "Desativar" como ações
+separadas, telefone exigindo 11 dígitos, Realtime com poll de 15s como
+fallback, fotos placeholder do Unsplash, `NEXT_PUBLIC_SITE_URL` adicionada
+por mim direto na Vercel (variável pública, sem risco) — tudo detalhado no
+histórico de commits do Git se precisar relembrar o porquê de cada uma.

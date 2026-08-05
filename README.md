@@ -8,8 +8,9 @@ celular (via link/QR code no balcão), a lanchonete gerencia tudo pelo painel
   telefone, tipo de entrega e horário. Atualiza em tempo real conforme outras
   pessoas reservam.
 - **Admin** (`/admin`): cadastra pratos do dia (com foto), marca pratos como
-  esgotados/desativados, e acompanha/conclui as reservas do dia. Sem login
-  por enquanto — é uma demo.
+  esgotados/desativados, e acompanha/conclui as reservas do dia. Protegido
+  por login (Supabase Auth) — veja `RESUMO.md` pro email/senha do usuário
+  de teste.
 - **QR code** (`/qrcode`): página pronta pra imprimir, com QR apontando pra
   home. Também existe um PNG em [`public/qrcode-cardapio.png`](public/qrcode-cardapio.png)
   gerado via `npm run qrcode`.
@@ -28,12 +29,22 @@ Storage + Realtime).
    (reserva atômica, sem race condition — testada com Postgres real via
    PGlite, veja `RESUMO.md`), habilita Realtime nas duas tabelas e cria o
    bucket público `pratos` no Storage.
-3. (Opcional, recomendado para a demo) Rode também
+3. Em seguida, cole e rode
+   [`supabase/migrations/0002_auth_e_rls.sql`](supabase/migrations/0002_auth_e_rls.sql)
+   — restringe escrita em `pratos_do_dia`/`reservas` e no Storage a usuários
+   autenticados (só o admin logado), mantendo leitura do cardápio e criação
+   de reserva públicas. Detalhes de cada policy e por que a RPC virou
+   `SECURITY DEFINER` estão no `RESUMO.md`.
+4. (Opcional, recomendado para a demo) Rode também
    [`supabase/seed.sql`](supabase/seed.sql) no SQL Editor — cadastra 3 pratos
    de exemplo já cobrindo os três estados de card: disponível, quase
    esgotado e esgotado.
-4. Em **Project Settings > API**, copie a **Project URL** e a **anon public
+5. Em **Project Settings > API**, copie a **Project URL** e a **anon public
    key**.
+6. Crie o usuário do dono da lanchonete (login de `/admin`): Dashboard →
+   **Authentication → Users → Add user**, marcando "Auto Confirm User". Email
+   e senha sugeridos estão no `RESUMO.md`. (Alternativa: rodar
+   `SUPABASE_SERVICE_ROLE_KEY=... node scripts/criar-admin.mjs`.)
 
 ## 2. Configurar variáveis de ambiente
 
@@ -74,9 +85,12 @@ imprimir).
 
 ## Sobre segurança (RLS)
 
-RLS está **desabilitado** de propósito nesta fase — é um MVP de demo sem
-multi-tenant e sem autenticação. Antes de ir pra produção com dados reais,
-adicione autenticação no `/admin` e políticas de RLS nas tabelas.
+Desde a `0002_auth_e_rls.sql`, RLS está habilitado: leitura do cardápio e
+criação de reserva continuam públicas (o cliente nunca faz login), mas
+qualquer escrita em `pratos_do_dia`/`reservas` (exceto o insert de reserva)
+exige uma sessão autenticada — é o dono da lanchonete logado em `/admin`.
+Ainda é single-tenant (um usuário só, sem multi-loja) — RLS por
+`estabelecimento_id` fica pra quando isso for necessário.
 
 ## Deploy
 
