@@ -1,137 +1,136 @@
 # Resumo — Guardou MVP pronto para demo
 
-Atualizado em 2026-08-05 — autenticação em produção, validada contra o
-banco real.
+Atualizado em 2026-08-05 — refino visual/UX aplicado e validado em produção.
 
 ## 🚀 URL de produção
 
 **https://guardou.vercel.app**
 
-✅ No ar com login funcionando, RLS restritiva ativa e o fluxo de reserva
-sem login testado direto na API real. Checklist completo na seção 1.
+## 🗺️ Estrutura de rotas (estado atual)
 
-## 🔑 Login do admin
+| Rota | O que é | Autenticação |
+|---|---|---|
+| `/` | Tela de escolha de perfil ("Sou Cliente" / "Sou Estabelecimento") | Nenhuma |
+| `/cardapio` | Cardápio do dia, reserva do cliente | Nenhuma (identificação leve nome+telefone em `localStorage`) |
+| `/admin` | Painel do estabelecimento (cadastrar prato, gerenciar reservas) | **Nenhuma no momento** — ver aviso abaixo |
+| `/qrcode` | Cartaz pra imprimir com QR apontando pra `/` | Nenhuma |
+| `/login` | Existe no repo, **não está linkada em lugar nenhum** | Dormant — ver aviso abaixo |
 
-| | |
-|---|---|
-| URL | `/login` (redireciona sozinho se você tentar `/admin` sem sessão) |
-| Email | `dono@guardou.app` |
-| Senha | `Guardou@2026` |
+## ⚠️ Aviso de segurança — leia antes de usar isso pra valer
 
-⚠️ **A senha acima está em texto puro neste arquivo** (que está commitado
-no repositório). Recomendo trocar essa senha depois da demo — Dashboard do
-Supabase → Authentication → Users → selecionar o usuário → "Reset
-password" (ou apagar este arquivo do histórico do git depois, se preferir
-não deixar a senha registrada permanentemente).
+Pra zerar fricção na demo, `/admin` **não pede login** e a RLS do banco
+está **pública** (qualquer um com a anon key pode ler/escrever
+`pratos_do_dia` e `reservas` — migration
+`supabase/migrations/0003_reverter_rls_para_demo.sql`). Isso é aceitável
+**só** neste contexto controlado de apresentação.
 
-## 1. Checklist final — tudo testado contra o banco/produção reais
+**Antes de usar com uma lanchonete de verdade**, reative a autenticação:
+1. Rode `supabase/migrations/0002_auth_e_rls.sql` de novo (RLS restrita:
+   escrita em `pratos_do_dia`/`reservas` só autenticada).
+2. Restaure a proteção de rota: existia um `src/proxy.ts` (removido nesta
+   simplificação, ainda no histórico do git) que redirecionava `/admin`
+   pra `/login` sem sessão.
+3. Linke `/login` de volta em algum lugar (a página continua no repo,
+   só não está referenciada) e troque o botão "← Voltar" do admin por
+   "Sair" (`src/components/admin/LogoutButton.tsx`, também preservado).
+4. O usuário `dono@guardou.app` no Supabase Auth não foi apagado — só
+   troque a senha antes de usar de verdade (a senha sugerida ficou
+   registrada em texto puro num RESUMO.md anterior, no histórico do git).
 
-| Item | Status |
-|---|---|
-| Login `dono@guardou.app` funciona (testei via API real, `/auth/v1/token`) | ✅ |
-| `/admin` sem sessão redireciona pra `/login` (local **e** produção) | ✅ |
-| Insert anônimo direto em `pratos_do_dia` via curl puro (sem app) é rejeitado pela RLS | ✅ HTTP 401, `permission denied`/`row-level security policy` |
-| Cliente reserva um prato **sem login nenhum** | ✅ (achei e corrigi um bug nesse fluxo — ver abaixo) |
-| Admin autenticado cria prato | ✅ |
-| Admin autenticado edita prato (preço/descrição) | ✅ |
-| Admin autenticado marca reserva como concluída | ✅ |
-| Fluxo completo local (`npm run dev` com credenciais reais) | ✅ |
-| Push + deploy automático na Vercel | ✅ |
-| Produção responde 200 em `/`, `/login`, `/qrcode`; 307→`/login` em `/admin` | ✅ |
-| Produção carrega os 3 pratos reais sem erro | ✅ |
-| QR code apontando pra URL final | ✅ (não mudou desde o deploy anterior, não precisou regenerar) |
-| Dados de teste limpos do banco real após cada validação | ✅ (conferido: sempre voltou a exatamente 3 pratos do seed, 0 reservas) |
+## 1. Refino visual e de UX feito nesta rodada
 
-## 2. Bug real que encontrei e que você corrigiu via MCP
+**Nenhuma lógica de negócio, RPC ou schema do banco foi alterada** — só
+aparência e experiência. Detalhes:
 
-Ao testar a reserva como cliente anônimo direto na API (mesmo teste que o
-botão "Reservar" dispara), a RPC `reservar_prato` retornava **"Prato não
-encontrado"** para um prato que evidentemente existia — mas a mesma
-chamada, autenticada como admin, funcionava normal. Ou seja: **nenhum
-cliente conseguia reservar nada** no banco real.
+### Identidade visual
+- Paleta de marca formalizada como CSS variables (`@theme` em
+  `globals.css`): `brand-*` (laranja/terracota, cor principal),
+  `accent-*` (vermelho, erros/gradiente), `warning-*` (âmbar, urgência),
+  `success-*` (verde, confirmações). Antes essas cores eram usadas soltas
+  (`orange-600`, `red-600` etc.) repetidas em cada componente; agora são
+  tokens únicos reutilizados em todo o app.
+- Favicon custom (`src/app/icon.svg`, ícone de tigela com gradiente da
+  marca) substituindo o ícone padrão do Next.js. Título da aba: "Guardou".
+  Tagline atualizada em toda parte: "Reserve seu prato do dia antes que
+  acabe."
+- Transições de 200-300ms consistentes (hover, troca de estado) e
+  animações de entrada leves (fade-in, fade-in-up, sheet-in) em modais e
+  na grade de cards — nada aparece "de repente".
 
-Diagnóstico: a função fazia `SELECT ... FOR UPDATE` em `pratos_do_dia`, e
-o Postgres exige que quem executa um `FOR UPDATE` também passe pela policy
-de **UPDATE** da tabela (não só a de SELECT) pra "enxergar" a linha — e a
-policy de UPDATE é restrita a `authenticated`. A função precisava rodar
-como `SECURITY DEFINER` (bypassando RLS) pra isso não importar, mas no
-banco real ela ainda estava com `prosecdef = false` (SECURITY INVOKER) —
-minha migration local já tinha o `security definer` certo desde o
-começo, mas o que foi efetivamente aplicado no banco (por outra sessão,
-via MCP) não incluiu isso.
+### Telas
+- **`/` (escolha de perfil)**: wordmark com ícone em gradiente, dois cards
+  grandes com ícone + seta indicando ação, tagline correta.
+- **Cardápio**: badge "Últimas unidades" agora calculado por **porcentagem
+  restante (<30%)**, não mais por um número fixo de unidades — puramente
+  uma mudança de critério visual, não mexe em `quantidade_reservada`/
+  `quantidade_total` nem na RPC. Texto mudou de "X restantes" pra "X
+  disponíveis". Card esgotado agora reduz a opacidade do card inteiro
+  (antes só escurecia a foto).
+- **Modal de reserva**: campos com mais espaço entre si, ícone de check
+  em SVG (antes era emoji ✅, que renderiza diferente por SO/navegador) na
+  tela de confirmação, horário e local de retirada destacados num card
+  separado, botão de fechar com área de toque maior.
+- **Admin**: formulário de novo prato com borda superior colorida
+  (destaque visual), contadores nos títulos das seções ("Pratos de hoje
+  (3)"), status de reserva com cor por estado (pendente/confirmada/
+  concluída/cancelada — antes só distinguia concluída de "todo o resto").
 
-Você aplicou a correção direto no banco:
-```sql
-alter function reservar_prato(uuid, text, text, text, time)
-security definer set search_path = public;
-```
-Confirmei `prosecdef: false → true`, refiz o teste (mesmo curl, mesmo
-prato real, sem login) e a reserva funcionou. Testei também que o
-"esgotado" continua sendo rejeitado corretamente depois da correção.
+### Bug real encontrado (não é só estilo)
+A tabela de reservas do admin usava `overflow-hidden` no container —
+isso **cortava** colunas inteiras (telefone, botão "Marcar concluída") em
+telas estreitas, em vez de permitir rolagem horizontal. Numa tela de
+375px, colunas essenciais simplesmente desapareciam sem aviso. Troquei
+pra `overflow-x-auto`. Esse é o tipo de bug que só aparece testando em
+viewport pequeno — vale conferir de novo se a lista de reservas crescer
+muito (muitas colunas) antes da demo.
 
-**Minha migration local (`0002_auth_e_rls.sql`) não precisou de nenhuma
-mudança** — ela já criava a função com `security definer set search_path
-= public` desde a primeira versão que escrevi. Só o banco real estava
-dessincronizado dela; agora os dois batem.
+## 2. Testes rodados após o refino (nada quebrou)
 
-## 3. Outro bug que encontrei nesta rodada (não relacionado a auth)
+Ciclo completo, direto contra o Supabase real e depois contra
+`https://guardou.vercel.app`, duas vezes (local e produção):
+1. Admin cadastra prato sem login.
+2. Prato aparece no `/cardapio` imediatamente.
+3. Cliente reserva sem login (testado até deixar o prato com <30% —
+   confirmei visualmente que o badge "Últimas unidades" aparece).
+4. Admin marca reserva como concluída — status visual muda de "Pendente"
+   pra "Concluída".
+5. Dados de teste sempre apagados depois — banco confirmado de volta a
+   exatamente os pratos reais (3 do seed + o que você mesmo cadastrou
+   manualmente, "kakdakdçad", que não toquei).
 
-Ao rodar `npm run dev` pela primeira vez com credenciais **reais** (antes
-só tinha testado com placeholder, que nunca chegava a renderizar nenhum
-prato), a home quebrou com **HTTP 500**:
+## 3. Decisões tomadas sozinho (revisão pendente sua)
 
-```
-Error: Invalid src prop (https://images.unsplash.com/...) on `next/image`,
-hostname "images.unsplash.com" is not configured under images in your
-next.config.js
-```
+- **Critério de "quase esgotado" mudou de número fixo pra porcentagem**
+  (<30% restante): o pedido especificava esse critério explicitamente;
+  antes (na v1 do MVP) era um número fixo de unidades. Só afeta quando o
+  badge aparece, não a lógica de reserva.
+- **"Onde retirar" na confirmação virou "No balcão, com seu nome"**: o
+  schema não tem campo de endereço/local da lanchonete, então usei o
+  texto que já existia informalmente ("apresente seu nome no balcão")
+  como o "local em destaque" pedido.
+- **Não fiz uma reformulação estrutural do dashboard admin** (ex: mover
+  formulário pra modal separado) — o layout atual (formulário em
+  destaque no topo + listas abaixo) já atendia "formulário em destaque",
+  e trocar pra modal traria risco de quebrar o fluxo sem ganho claro pra
+  demo de amanhã. Se quiser essa mudança estrutural, me avise.
+- **Não reescrevi toda a paleta com nomes 100% novos em todo componente**
+  — formalizei os tokens de marca (`brand`/`accent`/`warning`/`success`)
+  e troquei os usos principais, mas não fiz um find-and-replace cego de
+  cada cor neutra (`stone-*`) já que essas já eram consistentes e o
+  Tailwind v4 já as implementa via CSS variables internamente.
 
-`next.config.ts` só liberava `*.supabase.co` pro `next/image` — nunca
-tinha adicionado o Unsplash, e isso ficou mascarado todo esse tempo porque
-localmente eu só tinha credenciais placeholder (nenhum prato renderizava,
-então nenhuma imagem era carregada). Corrigi adicionando
-`images.unsplash.com` aos `remotePatterns`. Confirmado: home volta a
-carregar (local e produção) com as 3 fotos certas.
+## 4. Histórico — rodadas anteriores (contexto, ainda válido)
 
-## 4. O que foi implementado nesta rodada (resumo técnico)
+- **Deploy inicial**: Next.js + Supabase + Vercel configurados, RPC
+  `reservar_prato` testada via PGlite (reservar até esgotar, sem race
+  condition), seed de 3 pratos reais com fotos do Unsplash.
+- **Autenticação (revertida pra demo)**: Supabase Auth + RLS restritiva
+  foram implementados e chegaram a rodar em produção; um bug real foi
+  encontrado (RPC sem `SECURITY DEFINER` efetivo no banco, corrigido via
+  MCP) e outro (`next.config.ts` sem liberar `images.unsplash.com`,
+  corrigido). Depois, a pedido, essa autenticação foi revertida pra
+  simplificar a demo (ver aviso de segurança no topo deste arquivo) — o
+  código de login não foi apagado, só desconectado do fluxo ativo.
 
-- **Login real** via Supabase Auth + `@supabase/ssr` (sessão em cookies
-  compartilhados entre client/server). `src/proxy.ts` protege
-  `/admin/:path*` (renomeado de `middleware.ts` — Next 16 depreciou essa
-  convenção durante a sessão). Falha fechada se o Supabase não responder.
-- **Identificação leve do cliente**: modal "Como podemos te chamar?" na
-  primeira reserva, salvo em `localStorage`, link "Não é você?" pra
-  limpar. Sem conta, sem senha.
-- **RLS restritiva**: `pratos_do_dia` e `reservas` só aceitam escrita
-  autenticada (exceto insert de reserva, que continua público). Também
-  restringi `select` de `reservas` e upload no Storage — não foi pedido
-  explicitamente, mas é a mesma falha de segurança disfarçada (ver
-  detalhes na migration `0002_auth_e_rls.sql`).
-- **Testes**: 15 cenários de RLS/RPC validados com Postgres real via
-  PGlite (roles `anon`/`authenticated` de verdade, stub de `auth.uid()`)
-  antes de qualquer coisa chegar no banco real; depois, todo o checklist
-  da seção 1 validado direto contra a API real do Supabase e a URL de
-  produção.
-
-## 5. Decisões tomadas sozinho (revisão pendente sua)
-
-- **Email/senha do admin**: `dono@guardou.app` / `Guardou@2026` — só
-  sugestão, troque quando quiser (dashboard do Supabase).
-- **Erro de login genérico**, não revela se o email existe.
-- **`select` de `reservas` e upload de Storage restritos ao admin**: não
-  foi pedido explicitamente — reverta na migration se quiser deixar
-  público.
-- **`reservar_prato` como `SECURITY DEFINER`**: única forma de manter o
-  cliente reservando sem login com a RLS nova. Confirmado funcionando após
-  a correção no banco real.
-- **`proxy.ts` em vez de `middleware.ts`**: acompanhando a depreciação do
-  Next 16.
-
-## 6. Histórico — deploy inicial (sessões anteriores, ainda válido)
-
-Deploy original (sem auth) testado e confirmado no ar; RPC `reservar_prato`
-testada via PGlite (reservar até esgotar, rejeições, sem race condition);
-decisões de design da rodada inicial (cores, "marcar esgotado" vs
-"desativar", telefone com 11 dígitos, Realtime + poll de 15s, fotos
-placeholder do Unsplash). Detalhes completos no histórico de commits do
-Git.
+Detalhes completos de cada decisão e teste estão no histórico de commits
+do Git.
