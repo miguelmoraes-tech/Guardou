@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 import { hojeISO } from "@/lib/format";
 import { CardapioCliente } from "@/components/CardapioCliente";
 import type { PratoDoDia } from "@/lib/types";
@@ -6,6 +6,7 @@ import type { PratoDoDia } from "@/lib/types";
 export const revalidate = 0;
 
 async function buscarPratosDeHoje(): Promise<PratoDoDia[]> {
+  const supabase = await createClient();
   const { data } = await supabase
     .from("pratos_do_dia")
     .select("*")

@@ -10,6 +10,7 @@
     "qrcode": "node scripts/gerar-qrcode.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.0",
     "next": "16.3.0",
     "qrcode": "^1.5.4",
