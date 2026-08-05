@@ -2,20 +2,28 @@
 
 import { useState, type FormEvent } from "react";
 import { IMaskInput } from "react-imask";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import { formatarHorario, formatarPreco, HORARIO_FUNCIONAMENTO } from "@/lib/format";
+import { limparIdentidadeCliente, salvarIdentidadeCliente } from "@/lib/clienteIdentidade";
 import { Spinner } from "@/components/Spinner";
 import type { PratoDoDia, TipoEntrega } from "@/lib/types";
+import type { IdentidadeCliente } from "@/lib/clienteIdentidade";
 
 type ReservaModalProps = {
   prato: PratoDoDia;
+  identidadeInicial?: IdentidadeCliente | null;
   onClose: () => void;
   onReservado: () => void;
 };
 
-export function ReservaModal({ prato, onClose, onReservado }: ReservaModalProps) {
-  const [nome, setNome] = useState("");
-  const [telefone, setTelefone] = useState("");
+export function ReservaModal({
+  prato,
+  identidadeInicial,
+  onClose,
+  onReservado,
+}: ReservaModalProps) {
+  const [nome, setNome] = useState(identidadeInicial?.nome ?? "");
+  const [telefone, setTelefone] = useState(identidadeInicial?.telefone ?? "");
   const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>("retirada");
   const [horario, setHorario] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -49,6 +57,7 @@ export function ReservaModal({ prato, onClose, onReservado }: ReservaModalProps)
     }
 
     setEnviando(true);
+    const supabase = createClient();
     const { error } = await supabase.rpc("reservar_prato", {
       p_prato_id: prato.id,
       p_cliente_nome: nome.trim(),
@@ -69,8 +78,15 @@ export function ReservaModal({ prato, onClose, onReservado }: ReservaModalProps)
       return;
     }
 
+    salvarIdentidadeCliente({ nome: nome.trim(), telefone });
     setHorarioConfirmado(horario);
     onReservado();
+  }
+
+  function handleNaoEVoce() {
+    limparIdentidadeCliente();
+    setNome("");
+    setTelefone("");
   }
 
   return (
@@ -146,6 +162,16 @@ export function ReservaModal({ prato, onClose, onReservado }: ReservaModalProps)
                   className="rounded-xl border border-stone-300 px-4 py-3 text-stone-800 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                 />
               </label>
+
+              {identidadeInicial && (
+                <button
+                  type="button"
+                  onClick={handleNaoEVoce}
+                  className="-mt-2 self-start text-xs font-semibold text-orange-600 underline-offset-2 hover:underline"
+                >
+                  Não é você? Preencher com outros dados
+                </button>
+              )}
 
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-semibold text-stone-700">

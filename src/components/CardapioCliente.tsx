@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import { hojeISO } from "@/lib/format";
+import { lerIdentidadeCliente, salvarIdentidadeCliente } from "@/lib/clienteIdentidade";
 import { PratoCard } from "@/components/PratoCard";
 import { ReservaModal } from "@/components/ReservaModal";
+import { IdentificacaoModal } from "@/components/IdentificacaoModal";
 import type { PratoDoDia } from "@/lib/types";
+import type { IdentidadeCliente } from "@/lib/clienteIdentidade";
 
 type CardapioClienteProps = {
   pratosIniciais: PratoDoDia[];
@@ -14,8 +17,13 @@ type CardapioClienteProps = {
 export function CardapioCliente({ pratosIniciais }: CardapioClienteProps) {
   const [pratos, setPratos] = useState<PratoDoDia[]>(pratosIniciais);
   const [pratoSelecionado, setPratoSelecionado] = useState<PratoDoDia | null>(null);
+  const [pratoParaIdentificar, setPratoParaIdentificar] = useState<PratoDoDia | null>(
+    null
+  );
+  const [identidade, setIdentidade] = useState<IdentidadeCliente | null>(null);
 
   const buscarPratos = useCallback(async () => {
+    const supabase = createClient();
     const { data } = await supabase
       .from("pratos_do_dia")
       .select("*")
@@ -27,6 +35,7 @@ export function CardapioCliente({ pratosIniciais }: CardapioClienteProps) {
   }, []);
 
   useEffect(() => {
+    const supabase = createClient();
     const canal = supabase
       .channel("pratos-do-dia-realtime")
       .on(
@@ -46,6 +55,23 @@ export function CardapioCliente({ pratosIniciais }: CardapioClienteProps) {
     };
   }, [buscarPratos]);
 
+  function handleReservar(prato: PratoDoDia) {
+    const salva = lerIdentidadeCliente();
+    if (salva) {
+      setIdentidade(salva);
+      setPratoSelecionado(prato);
+    } else {
+      setPratoParaIdentificar(prato);
+    }
+  }
+
+  function handleIdentificado(dados: IdentidadeCliente) {
+    salvarIdentidadeCliente(dados);
+    setIdentidade(dados);
+    setPratoSelecionado(pratoParaIdentificar);
+    setPratoParaIdentificar(null);
+  }
+
   return (
     <>
       {pratos.length === 0 ? (
@@ -62,18 +88,22 @@ export function CardapioCliente({ pratosIniciais }: CardapioClienteProps) {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {pratos.map((prato) => (
-            <PratoCard
-              key={prato.id}
-              prato={prato}
-              onReservar={setPratoSelecionado}
-            />
+            <PratoCard key={prato.id} prato={prato} onReservar={handleReservar} />
           ))}
         </div>
+      )}
+
+      {pratoParaIdentificar && (
+        <IdentificacaoModal
+          onCancelar={() => setPratoParaIdentificar(null)}
+          onIdentificado={handleIdentificado}
+        />
       )}
 
       {pratoSelecionado && (
         <ReservaModal
           prato={pratoSelecionado}
+          identidadeInicial={identidade}
           onClose={() => setPratoSelecionado(null)}
           onReservado={buscarPratos}
         />
