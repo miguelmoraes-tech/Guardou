@@ -34,7 +34,7 @@ export function PratosList({ pratos, onAlterado }: PratosListProps) {
 
   if (pratos.length === 0) {
     return (
-      <p className="rounded-2xl bg-white p-5 text-center text-sm text-stone-400 ring-1 ring-black/5">
+      <p className="rounded-2xl bg-white p-5 text-center text-sm text-stone-400 ring-1 ring-stone-900/5">
         Nenhum prato cadastrado hoje ainda.
       </p>
     );
@@ -47,11 +47,11 @@ export function PratosList({ pratos, onAlterado }: PratosListProps) {
         return (
           <div
             key={prato.id}
-            className={`flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-black/5 ${
+            className={`flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-stone-900/5 transition-opacity duration-200 ${
               !prato.ativo ? "opacity-50" : ""
             }`}
           >
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-orange-100 text-2xl">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-brand-100 text-2xl">
               {prato.foto_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -74,7 +74,7 @@ export function PratosList({ pratos, onAlterado }: PratosListProps) {
                 <span className="text-xs font-semibold text-stone-400">Desativado</span>
               )}
               {prato.ativo && esgotado && (
-                <span className="text-xs font-semibold text-red-500">Esgotado</span>
+                <span className="text-xs font-semibold text-accent-600">Esgotado</span>
               )}
             </div>
 
@@ -85,7 +85,7 @@ export function PratosList({ pratos, onAlterado }: PratosListProps) {
                     type="button"
                     disabled={processando === prato.id}
                     onClick={() => marcarEsgotado(prato)}
-                    className="whitespace-nowrap rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700 transition hover:bg-amber-200 disabled:opacity-50"
+                    className="whitespace-nowrap rounded-lg bg-warning-100 px-3 py-1.5 text-xs font-bold text-warning-700 transition-colors duration-150 hover:bg-amber-200 disabled:opacity-50"
                   >
                     Marcar esgotado
                   </button>
@@ -94,7 +94,7 @@ export function PratosList({ pratos, onAlterado }: PratosListProps) {
                   type="button"
                   disabled={processando === prato.id}
                   onClick={() => desativar(prato)}
-                  className="whitespace-nowrap rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-bold text-stone-600 transition hover:bg-stone-200 disabled:opacity-50"
+                  className="whitespace-nowrap rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-bold text-stone-600 transition-colors duration-150 hover:bg-stone-200 disabled:opacity-50"
                 >
                   Desativar
                 </button>

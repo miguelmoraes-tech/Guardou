@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { hojeISO } from "@/lib/format";
 import { CardapioCliente } from "@/components/CardapioCliente";
@@ -21,15 +22,21 @@ export default async function CardapioPage() {
   const pratos = await buscarPratosDeHoje();
 
   return (
-    <div className="min-h-screen bg-orange-50/40">
-      <header className="bg-gradient-to-br from-orange-600 to-red-600 px-4 pb-8 pt-10 text-white shadow-md">
+    <div className="min-h-screen bg-brand-50/40">
+      <header className="bg-gradient-to-br from-brand-600 to-accent-700 px-4 pb-8 pt-6 text-white shadow-md">
         <div className="mx-auto max-w-5xl">
-          <p className="text-sm font-semibold uppercase tracking-wide text-orange-100">
+          <Link
+            href="/"
+            className="text-sm font-medium text-white/80 transition hover:text-white"
+          >
+            ← Início
+          </Link>
+          <p className="mt-3 text-sm font-semibold uppercase tracking-wide text-brand-100">
             Cardápio de hoje
           </p>
           <h1 className="mt-1 text-3xl font-extrabold">🍲 Guardou</h1>
-          <p className="mt-2 max-w-md text-orange-50">
-            Reserve seu prato agora e evite fila — pague só na retirada.
+          <p className="mt-2 max-w-md text-brand-50">
+            Reserve seu prato do dia antes que acabe.
           </p>
         </div>
       </header>

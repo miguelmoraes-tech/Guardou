@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Guardou — Cardápio do dia",
-  description: "Reserve seu prato do dia e evite fila na lanchonete",
+  title: "Guardou",
+  description: "Reserve seu prato do dia antes que acabe.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

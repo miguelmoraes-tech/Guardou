@@ -75,7 +75,7 @@ export function CardapioCliente({ pratosIniciais }: CardapioClienteProps) {
   return (
     <>
       {pratos.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-3xl bg-white/60 px-6 py-20 text-center ring-1 ring-black/5">
+        <div className="flex flex-col items-center justify-center gap-3 rounded-3xl bg-white/60 px-6 py-20 text-center ring-1 ring-stone-900/5 animate-fade-in">
           <span className="text-5xl">🍳</span>
           <h2 className="text-lg font-bold text-stone-700">
             Nenhum prato publicado hoje
@@ -87,8 +87,14 @@ export function CardapioCliente({ pratosIniciais }: CardapioClienteProps) {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {pratos.map((prato) => (
-            <PratoCard key={prato.id} prato={prato} onReservar={handleReservar} />
+          {pratos.map((prato, indice) => (
+            <div
+              key={prato.id}
+              className="animate-fade-in-up"
+              style={{ animationDelay: `${Math.min(indice, 6) * 40}ms` }}
+            >
+              <PratoCard prato={prato} onReservar={handleReservar} />
+            </div>
           ))}
         </div>
       )}

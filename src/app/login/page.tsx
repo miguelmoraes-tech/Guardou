@@ -36,7 +36,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-900/5">
         <div className="mb-6 flex flex-col items-center gap-1 text-center">
           <span className="text-4xl">🍲</span>
           <h1 className="text-xl font-extrabold text-stone-800">Guardou · Admin</h1>
@@ -53,7 +53,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="dono@lanchonete.com"
-              className="rounded-xl border border-stone-300 px-4 py-3 text-stone-800 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              className="rounded-xl border border-stone-300 px-4 py-3 text-stone-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
             />
           </label>
 
@@ -66,12 +66,12 @@ export default function LoginPage() {
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
               placeholder="••••••••"
-              className="rounded-xl border border-stone-300 px-4 py-3 text-stone-800 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              className="rounded-xl border border-stone-300 px-4 py-3 text-stone-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
             />
           </label>
 
           {erro && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600">
+            <p className="rounded-lg bg-accent-500/10 px-3 py-2 text-sm font-medium text-accent-700">
               {erro}
             </p>
           )}
@@ -80,7 +80,7 @@ export default function LoginPage() {
             type="submit"
             disabled={enviando}
             aria-busy={enviando}
-            className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 py-3 font-bold text-white transition hover:bg-orange-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-3 font-bold text-white transition hover:bg-brand-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {enviando && <Spinner />}
             {enviando ? "Entrando..." : "Entrar"}

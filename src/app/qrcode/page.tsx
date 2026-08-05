@@ -13,8 +13,8 @@ export default function QrCodePage() {
         <p className="text-stone-500">Escaneie e reserve o prato do dia</p>
       </div>
 
-      <div className="rounded-2xl border-4 border-orange-600 p-6">
-        <QRCodeSVG value={url} size={280} fgColor="#c2410c" />
+      <div className="rounded-2xl border-4 border-brand-600 p-6">
+        <QRCodeSVG value={url} size={280} fgColor="#b53d0e" />
       </div>
 
       <p className="max-w-xs text-sm text-stone-400">{url}</p>
@@ -22,7 +22,7 @@ export default function QrCodePage() {
       <button
         type="button"
         onClick={() => window.print()}
-        className="rounded-xl bg-orange-600 px-6 py-3 font-bold text-white transition hover:bg-orange-700 print:hidden"
+        className="rounded-xl bg-brand-600 px-6 py-3 font-bold text-white transition-colors duration-150 hover:bg-brand-700 print:hidden"
       >
         Imprimir cartaz
       </button>

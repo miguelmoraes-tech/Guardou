@@ -29,6 +29,16 @@ export function pratoEsgotado(prato: {
   return prato.quantidade_reservada >= prato.quantidade_total;
 }
 
+// Só de exibição: mostra o badge de urgência quando resta menos de 30%.
+export function pratoQuaseEsgotado(prato: {
+  quantidade_total: number;
+  quantidade_reservada: number;
+}): boolean {
+  if (prato.quantidade_total <= 0) return false;
+  const restantes = unidadesRestantes(prato);
+  return restantes > 0 && restantes / prato.quantidade_total < 0.3;
+}
+
 export function hojeISO(): string {
   const agora = new Date();
   const offset = agora.getTimezoneOffset();

@@ -85,12 +85,14 @@ export function NovoPratoForm({ onCriado }: NovoPratoFormProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex flex-col gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5"
+      className="flex flex-col gap-4 rounded-2xl border-t-4 border-brand-600 bg-white p-5 shadow-sm ring-1 ring-stone-900/5"
     >
-      <h2 className="text-lg font-bold text-stone-800">Novo prato do dia</h2>
+      <h2 className="flex items-center gap-2 text-lg font-bold text-stone-800">
+        <span className="text-xl">✏️</span> Novo prato do dia
+      </h2>
 
       <div className="flex flex-col gap-4 sm:flex-row">
-        <label className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 p-4 text-center transition hover:border-orange-400 sm:w-40 sm:shrink-0">
+        <label className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 p-4 text-center transition-colors duration-150 hover:border-brand-400 sm:w-40 sm:shrink-0">
           {previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -122,7 +124,7 @@ export function NovoPratoForm({ onCriado }: NovoPratoFormProps) {
               value={nome}
               onChange={(e) => setNome(e.target.value)}
               placeholder="Ex: Feijoada completa"
-              className="rounded-xl border border-stone-300 px-4 py-2.5 text-stone-800 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              className="rounded-xl border border-stone-300 px-4 py-2.5 text-stone-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
             />
           </label>
 
@@ -133,7 +135,7 @@ export function NovoPratoForm({ onCriado }: NovoPratoFormProps) {
               onChange={(e) => setDescricao(e.target.value)}
               placeholder="Ingredientes, acompanhamentos..."
               rows={2}
-              className="resize-none rounded-xl border border-stone-300 px-4 py-2.5 text-stone-800 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+              className="resize-none rounded-xl border border-stone-300 px-4 py-2.5 text-stone-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
             />
           </label>
         </div>
@@ -149,7 +151,7 @@ export function NovoPratoForm({ onCriado }: NovoPratoFormProps) {
             value={preco}
             onChange={(e) => setPreco(e.target.value)}
             placeholder="25,90"
-            className="rounded-xl border border-stone-300 px-4 py-2.5 text-stone-800 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            className="rounded-xl border border-stone-300 px-4 py-2.5 text-stone-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
           />
         </label>
 
@@ -162,13 +164,13 @@ export function NovoPratoForm({ onCriado }: NovoPratoFormProps) {
             value={quantidadeTotal}
             onChange={(e) => setQuantidadeTotal(e.target.value)}
             placeholder="20"
-            className="rounded-xl border border-stone-300 px-4 py-2.5 text-stone-800 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+            className="rounded-xl border border-stone-300 px-4 py-2.5 text-stone-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
           />
         </label>
       </div>
 
       {erro && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600">
+        <p className="rounded-lg bg-accent-500/10 px-3 py-2 text-sm font-medium text-accent-700">
           {erro}
         </p>
       )}
@@ -177,7 +179,7 @@ export function NovoPratoForm({ onCriado }: NovoPratoFormProps) {
         type="submit"
         disabled={enviando}
         aria-busy={enviando}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 py-3 font-bold text-white transition hover:bg-orange-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 py-3.5 font-bold text-white transition-transform duration-200 hover:bg-brand-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {enviando && <Spinner />}
         {enviando ? "Publicando..." : "Publicar prato"}

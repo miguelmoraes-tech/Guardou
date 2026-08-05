@@ -70,12 +70,22 @@ export function AdminClient({ pratosIniciais, reservasIniciais }: AdminClientPro
       </div>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-bold text-stone-800">Pratos de hoje</h2>
+        <h2 className="flex items-center gap-2 text-lg font-bold text-stone-800">
+          Pratos de hoje
+          <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs font-bold text-stone-600">
+            {pratos.length}
+          </span>
+        </h2>
         <PratosList pratos={pratos} onAlterado={recarregar} />
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-bold text-stone-800">Reservas de hoje</h2>
+        <h2 className="flex items-center gap-2 text-lg font-bold text-stone-800">
+          Reservas de hoje
+          <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs font-bold text-stone-600">
+            {reservas.length}
+          </span>
+        </h2>
         <ReservasList reservas={reservas} onAlterado={recarregar} />
       </section>
     </div>
