@@ -1,43 +1,148 @@
 # Resumo — Guardou MVP pronto para demo
 
-Atualizado em 2026-08-05 — refino visual/UX aplicado e validado em produção.
+Atualizado em 2026-08-06 — app virou multi-tenant (várias lanchonetes, cada
+uma com seu próprio cardápio e QR code) e validado em produção.
 
 ## 🚀 URL de produção
 
 **https://guardou.vercel.app**
 
+## 🏪 Lanchonete da apresentação de amanhã
+
+**Slug: `lanchonete-do-curso`** — link direto pro cardápio dela:
+**https://guardou.vercel.app/l/lanchonete-do-curso**
+
+O QR code pra imprimir está dentro do painel dela, em
+`/admin/lanchonete-do-curso` → seção "Meu QR Code" → botão "Baixar QR code
+(PNG)". Ele já aponta pra essa URL.
+
+⚠️ **Antes da apresentação**: os 3 pratos do seed (+ os que você cadastrou
+manualmente) estão datados de **2026-08-05** (ontem) — a coluna `data` de
+`pratos_do_dia` é por dia, então o cardápio de hoje vai aparecer **vazio**
+("Nenhum prato publicado hoje") até você publicar pratos novos em
+`/admin/lanchonete-do-curso` com a data de hoje. Isso é comportamento
+normal (já existia antes do multi-tenant), não um bug — só não esqueça de
+recadastrar o cardápio de amanhã antes de começar.
+
 ## 🗺️ Estrutura de rotas (estado atual)
 
 | Rota | O que é | Autenticação |
 |---|---|---|
-| `/` | Tela de escolha de perfil ("Sou Cliente" / "Sou Estabelecimento") | Nenhuma |
-| `/cardapio` | Cardápio do dia, reserva do cliente | Nenhuma (identificação leve nome+telefone em `localStorage`) |
-| `/admin` | Painel do estabelecimento (cadastrar prato, gerenciar reservas) | **Nenhuma no momento** — ver aviso abaixo |
-| `/qrcode` | Cartaz pra imprimir com QR apontando pra `/` | Nenhuma |
+| `/` | Tela de escolha de perfil ("Sou Cliente" / "Sou Estabelecimento"), cada uma com seu sub-fluxo (ver abaixo) | Nenhuma |
+| `/l/[slug]` | Cardápio do dia **daquela lanchonete**, reserva do cliente. Slug inválido mostra tela amigável "Lanchonete não encontrada" | Nenhuma (identificação leve nome+telefone em `localStorage`) |
+| `/admin/[slug]` | Painel **daquela lanchonete** (cadastrar prato, gerenciar reservas, ver/baixar QR code, trocar de lanchonete) | **Nenhuma** — ver aviso abaixo |
+| `/qrcode` | Cartaz genérico antigo, aponta pra `/` (não pra uma lanchonete específica) — pré-multi-tenant, mantido mas não é o QR que se usa hoje | Nenhuma |
 | `/login` | Existe no repo, **não está linkada em lugar nenhum** | Dormant — ver aviso abaixo |
+
+As rotas antigas `/admin` e `/cardapio` (single-tenant) foram **removidas**
+nesta rodada — elas não filtravam por lanchonete e vazariam dados de todas
+as lanchonetes juntas depois do multi-tenant. `/admin/[slug]` e
+`/l/[slug]` são os únicos caminhos agora.
+
+### Sub-fluxo "Sou Estabelecimento" (em `/`)
+
+- Se já existe um slug salvo em `localStorage`
+  (`guardou_minha_lanchonete`), redireciona direto pra `/admin/[slug]`.
+- Senão, duas opções: **"Criar minha lanchonete"** (nome + logo opcional →
+  RPC `criar_lanchonete` gera o slug, com sufixo numérico em caso de
+  colisão de nome) ou **"Já tenho uma lanchonete"** (busca/lista as
+  existentes). Qualquer uma das duas salva o slug no `localStorage` e
+  redireciona pro painel.
+- Botão "Trocar de lanchonete" no painel limpa o `localStorage` e volta
+  pra `/`.
+
+### Sub-fluxo "Sou Cliente" (em `/`)
+
+- Lista todas as lanchonetes cadastradas (nome + logo) pra quem não tem o
+  QR em mãos — normalmente o cliente chega direto em `/l/[slug]` via QR
+  code.
 
 ## ⚠️ Aviso de segurança — leia antes de usar isso pra valer
 
-Pra zerar fricção na demo, `/admin` **não pede login** e a RLS do banco
-está **pública** (qualquer um com a anon key pode ler/escrever
+Pra zerar fricção na demo, `/admin/[slug]` **não pede login** — qualquer
+um que souber (ou adivinhar) o slug de uma lanchonete entra direto no
+painel dela, sem senha nenhuma, e a RLS do banco está **pública**
+(qualquer um com a anon key pode ler/escrever `lanchonetes`,
 `pratos_do_dia` e `reservas` — migration
-`supabase/migrations/0003_reverter_rls_para_demo.sql`). Isso é aceitável
-**só** neste contexto controlado de apresentação.
+`supabase/migrations/0003_reverter_rls_para_demo.sql`, agora estendida
+pra `lanchonetes` na `0004_multi_tenant.sql`). Isso é aceitável **só**
+neste contexto controlado de apresentação — o multi-tenant desta rodada
+foi proposital pra reduzir risco de bug de auth, não pra virar produto
+multi-cliente de verdade sem antes resolver isso.
 
 **Antes de usar com uma lanchonete de verdade**, reative a autenticação:
 1. Rode `supabase/migrations/0002_auth_e_rls.sql` de novo (RLS restrita:
-   escrita em `pratos_do_dia`/`reservas` só autenticada).
+   escrita em `pratos_do_dia`/`reservas` só autenticada) e adapte pra
+   `lanchonetes` também.
 2. Restaure a proteção de rota: existia um `src/proxy.ts` (removido nesta
    simplificação, ainda no histórico do git) que redirecionava `/admin`
-   pra `/login` sem sessão.
+   pra `/login` sem sessão — precisa virar `/admin/[slug]` e confirmar
+   que a sessão logada corresponde à lanchonete daquele slug (não só que
+   existe uma sessão qualquer).
 3. Linke `/login` de volta em algum lugar (a página continua no repo,
-   só não está referenciada) e troque o botão "← Voltar" do admin por
-   "Sair" (`src/components/admin/LogoutButton.tsx`, também preservado).
+   só não está referenciada) e troque o botão "Trocar de lanchonete" do
+   admin por "Sair" (`src/components/admin/LogoutButton.tsx`, também
+   preservado).
 4. O usuário `dono@guardou.app` no Supabase Auth não foi apagado — só
    troque a senha antes de usar de verdade (a senha sugerida ficou
    registrada em texto puro num RESUMO.md anterior, no histórico do git).
 
-## 1. Refino visual e de UX feito nesta rodada
+## 1. Multi-tenant: cada lanchonete com seu cardápio e QR code (esta rodada)
+
+Migration `supabase/migrations/0004_multi_tenant.sql`: tabela
+`lanchonetes` nova (`id`, `nome`, `slug` único, `logo_url`,
+`cor_primaria`), `lanchonete_id` (not null, FK) adicionado em
+`pratos_do_dia` e `reservas`. RLS continua desabilitado — mesma decisão
+já tomada, agora estendida pra tabela nova.
+
+- **RPC `criar_lanchonete(nome, logo_url, cor_primaria)`**: gera o slug a
+  partir do nome (`slugify`, minúsculo/sem acento/hifens), resolve
+  colisão com sufixo numérico (`-2`, `-3`...) via retry em
+  `unique_violation` — atômico mesmo com dois cadastros simultâneos com o
+  mesmo nome.
+- **RPC `reservar_prato`**: agora grava `lanchonete_id` na reserva
+  **herdado do prato** (não confia num valor vindo do cliente) — mesma
+  assinatura de antes, nenhuma mudança no `ReservaModal.tsx`.
+- **Backfill dos dados existentes**: criei a lanchonete "Lanchonete do
+  Curso" e associei a ela todos os pratos que já existiam em produção (os
+  3 do seed + 2 cadastrados manualmente por você, incluindo o
+  "kakdakdçad") — nenhum prato ficou órfão.
+- **Rotas novas**: `/admin/[slug]` e `/l/[slug]` (detalhes na seção de
+  rotas acima). As antigas `/admin` e `/cardapio` foram removidas.
+- **QR code**: `QrCodeCard` trocou de `QRCodeSVG` pra `QRCodeCanvas` (com
+  ref) só pra viabilizar o botão "Baixar QR code (PNG)" — usa
+  `canvas.toDataURL('image/png')`. A URL codificada agora é
+  `${NEXT_PUBLIC_SITE_URL ?? window.location.origin}/l/[slug]`.
+- **Upload de logo**: reaproveita o bucket `pratos` (já público, sem
+  auth) numa subpasta `logos/` — não criei bucket novo pra isso.
+
+### Teste de isolamento multi-tenant (local e produção)
+
+Criei uma segunda lanchonete de teste de verdade (via a RPC
+`criar_lanchonete`, não inserção direta) tanto local quanto contra
+`https://guardou.vercel.app` depois do deploy, em cada ambiente:
+1. Cadastrei um prato datado de hoje em cada lanchonete (a "do Curso" e a
+   de teste).
+2. Confirmei que `/l/[slug]` de cada uma mostra **só** o prato dela — o
+   prato da outra não aparece.
+3. Reservei o prato da lanchonete de teste via `reservar_prato`.
+4. Confirmei que `/admin/[slug]` da lanchonete de teste mostra a reserva,
+   e que `/admin/lanchonete-do-curso` **não mostra nada** (isolamento
+   também nas reservas, não só no cardápio).
+5. Confirmei que o QR code gerado no admin da lanchonete de teste aponta
+   pra URL certa (`.../l/[slug-da-teste]`), e que um slug inválido
+   (`/l/nao-existe-xyz`) mostra a tela amigável "Lanchonete não
+   encontrada" em vez de quebrar.
+6. Apaguei a lanchonete de teste e tudo que criei nela (prato + reserva)
+   em ambos os ambientes — banco de produção confirmado de volta a
+   exatamente os dados que já existiam antes (só "Lanchonete do Curso",
+   nenhum prato/reserva extra).
+
+Slug final que vai ser usado na apresentação: **`lanchonete-do-curso`**
+(detalhes e link direto na seção "🏪 Lanchonete da apresentação de
+amanhã", no topo deste arquivo).
+
+## 2. Refino visual e de UX (rodada anterior, 2026-08-05)
 
 **Nenhuma lógica de negócio, RPC ou schema do banco foi alterada** — só
 aparência e experiência. Detalhes:
@@ -84,7 +189,7 @@ pra `overflow-x-auto`. Esse é o tipo de bug que só aparece testando em
 viewport pequeno — vale conferir de novo se a lista de reservas crescer
 muito (muitas colunas) antes da demo.
 
-## 2. Testes rodados após o refino (nada quebrou)
+## 3. Testes rodados após o refino visual (nada quebrou)
 
 Ciclo completo, direto contra o Supabase real e depois contra
 `https://guardou.vercel.app`, duas vezes (local e produção):
@@ -98,8 +203,24 @@ Ciclo completo, direto contra o Supabase real e depois contra
    exatamente os pratos reais (3 do seed + o que você mesmo cadastrou
    manualmente, "kakdakdçad", que não toquei).
 
-## 3. Decisões tomadas sozinho (revisão pendente sua)
+## 4. Decisões tomadas sozinho (revisão pendente sua)
 
+- **Removi `/admin` e `/cardapio` (single-tenant) em vez de manter como
+  redirect**: o pedido não falou explicitamente delas, mas depois do
+  multi-tenant elas ficariam mostrando pratos/reservas de todas as
+  lanchonetes misturados (vazamento entre tenants), o que é pior que
+  simplesmente não existirem mais. Se você tinha links/favoritos
+  antigos apontando pra `/admin` ou `/cardapio`, eles agora quebram —
+  me avise se isso for um problema pra amanhã.
+- **Logo da lanchonete vai pro bucket `pratos` já existente** (subpasta
+  `logos/`), não criei bucket novo — evita mexer em política de storage
+  na véspera, e o bucket já é público sem auth do jeito que a demo
+  precisa.
+- **Não toquei em `/qrcode`** (o pôster genérico que aponta pra `/`,
+  pré-multi-tenant): ele não referencia `pratos_do_dia` nem quebra com a
+  mudança, só ficou menos útil (não leva direto a um cardápio). O QR que
+  importa pra amanhã é o de dentro do admin da lanchonete
+  (`/admin/lanchonete-do-curso` → "Meu QR Code").
 - **Critério de "quase esgotado" mudou de número fixo pra porcentagem**
   (<30% restante): o pedido especificava esse critério explicitamente;
   antes (na v1 do MVP) era um número fixo de unidades. Só afeta quando o
@@ -119,7 +240,7 @@ Ciclo completo, direto contra o Supabase real e depois contra
   cada cor neutra (`stone-*`) já que essas já eram consistentes e o
   Tailwind v4 já as implementa via CSS variables internamente.
 
-## 4. Histórico — rodadas anteriores (contexto, ainda válido)
+## 5. Histórico — rodadas anteriores (contexto, ainda válido)
 
 - **Deploy inicial**: Next.js + Supabase + Vercel configurados, RPC
   `reservar_prato` testada via PGlite (reservar até esgotar, sem race
