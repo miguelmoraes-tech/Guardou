@@ -11,10 +11,11 @@ import type { PratoDoDia } from "@/lib/types";
 import type { IdentidadeCliente } from "@/lib/clienteIdentidade";
 
 type CardapioClienteProps = {
+  lanchoneteId: string;
   pratosIniciais: PratoDoDia[];
 };
 
-export function CardapioCliente({ pratosIniciais }: CardapioClienteProps) {
+export function CardapioCliente({ lanchoneteId, pratosIniciais }: CardapioClienteProps) {
   const [pratos, setPratos] = useState<PratoDoDia[]>(pratosIniciais);
   const [pratoSelecionado, setPratoSelecionado] = useState<PratoDoDia | null>(null);
   const [pratoParaIdentificar, setPratoParaIdentificar] = useState<PratoDoDia | null>(
@@ -27,20 +28,26 @@ export function CardapioCliente({ pratosIniciais }: CardapioClienteProps) {
     const { data } = await supabase
       .from("pratos_do_dia")
       .select("*")
+      .eq("lanchonete_id", lanchoneteId)
       .eq("data", hojeISO())
       .eq("ativo", true)
       .order("created_at", { ascending: true });
 
     if (data) setPratos(data as PratoDoDia[]);
-  }, []);
+  }, [lanchoneteId]);
 
   useEffect(() => {
     const supabase = createClient();
     const canal = supabase
-      .channel("pratos-do-dia-realtime")
+      .channel(`pratos-do-dia-realtime-${lanchoneteId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "pratos_do_dia" },
+        {
+          event: "*",
+          schema: "public",
+          table: "pratos_do_dia",
+          filter: `lanchonete_id=eq.${lanchoneteId}`,
+        },
         () => {
           buscarPratos();
         }
@@ -53,7 +60,7 @@ export function CardapioCliente({ pratosIniciais }: CardapioClienteProps) {
       supabase.removeChannel(canal);
       clearInterval(intervalo);
     };
-  }, [buscarPratos]);
+  }, [lanchoneteId, buscarPratos]);
 
   function handleReservar(prato: PratoDoDia) {
     const salva = lerIdentidadeCliente();

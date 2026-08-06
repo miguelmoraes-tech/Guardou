@@ -2,6 +2,12 @@
 -- Roda com segurança várias vezes: sempre limpa os pratos de HOJE cadastrados
 -- por este seed (identificados pelo nome) antes de inserir de novo.
 -- Fotos são placeholders do Unsplash — troque por fotos reais no /admin quando tiver.
+-- Todo prato pertence a uma lanchonete (multi-tenant) — usa a "Lanchonete do
+-- Curso", criada na migration 0004_multi_tenant.sql.
+
+insert into lanchonetes (nome, slug)
+values ('Lanchonete do Curso', 'lanchonete-do-curso')
+on conflict (slug) do nothing;
 
 delete from pratos_do_dia
 where data = current_date
@@ -13,8 +19,9 @@ where data = current_date
 
 -- 1) Bastante disponível
 insert into pratos_do_dia
-  (nome, descricao, preco, foto_url, quantidade_total, quantidade_reservada, data, ativo)
+  (lanchonete_id, nome, descricao, preco, foto_url, quantidade_total, quantidade_reservada, data, ativo)
 values (
+  (select id from lanchonetes where slug = 'lanchonete-do-curso'),
   'Frango grelhado, arroz, feijão e salada',
   'Peito de frango grelhado no ponto, arroz soltinho, feijão caseiro e salada fresca da horta.',
   18.90,
@@ -27,8 +34,9 @@ values (
 
 -- 2) Quase esgotado (4 de 5)
 insert into pratos_do_dia
-  (nome, descricao, preco, foto_url, quantidade_total, quantidade_reservada, data, ativo)
+  (lanchonete_id, nome, descricao, preco, foto_url, quantidade_total, quantidade_reservada, data, ativo)
 values (
+  (select id from lanchonetes where slug = 'lanchonete-do-curso'),
   'Feijoada completa',
   'Feijoada tradicional com linguiça, costelinha e bacon, acompanha arroz, couve e farofa.',
   24.90,
@@ -41,8 +49,9 @@ values (
 
 -- 3) Esgotado
 insert into pratos_do_dia
-  (nome, descricao, preco, foto_url, quantidade_total, quantidade_reservada, data, ativo)
+  (lanchonete_id, nome, descricao, preco, foto_url, quantidade_total, quantidade_reservada, data, ativo)
 values (
+  (select id from lanchonetes where slug = 'lanchonete-do-curso'),
   'Estrogonofe de carne',
   'Estrogonofe cremoso de carne com champignon, servido com arroz branco e batata palha.',
   21.90,

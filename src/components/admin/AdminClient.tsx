@@ -7,14 +7,19 @@ import { NovoPratoForm } from "@/components/admin/NovoPratoForm";
 import { PratosList } from "@/components/admin/PratosList";
 import { ReservasList } from "@/components/admin/ReservasList";
 import { QrCodeCard } from "@/components/admin/QrCodeCard";
-import type { PratoDoDia, ReservaComPrato } from "@/lib/types";
+import type { Lanchonete, PratoDoDia, ReservaComPrato } from "@/lib/types";
 
 type AdminClientProps = {
+  lanchonete: Lanchonete;
   pratosIniciais: PratoDoDia[];
   reservasIniciais: ReservaComPrato[];
 };
 
-export function AdminClient({ pratosIniciais, reservasIniciais }: AdminClientProps) {
+export function AdminClient({
+  lanchonete,
+  pratosIniciais,
+  reservasIniciais,
+}: AdminClientProps) {
   const [pratos, setPratos] = useState<PratoDoDia[]>(pratosIniciais);
   const [reservas, setReservas] = useState<ReservaComPrato[]>(reservasIniciais);
 
@@ -26,31 +31,43 @@ export function AdminClient({ pratosIniciais, reservasIniciais }: AdminClientPro
       supabase
         .from("pratos_do_dia")
         .select("*")
+        .eq("lanchonete_id", lanchonete.id)
         .eq("data", hoje)
         .order("created_at", { ascending: true }),
       supabase
         .from("reservas")
         .select("*, pratos_do_dia!inner(nome)")
+        .eq("lanchonete_id", lanchonete.id)
         .eq("pratos_do_dia.data", hoje)
         .order("horario_desejado", { ascending: true }),
     ]);
 
     if (pratosData) setPratos(pratosData as PratoDoDia[]);
     if (reservasData) setReservas(reservasData as unknown as ReservaComPrato[]);
-  }, []);
+  }, [lanchonete.id]);
 
   useEffect(() => {
     const supabase = createClient();
     const canal = supabase
-      .channel("admin-realtime")
+      .channel(`admin-realtime-${lanchonete.id}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "pratos_do_dia" },
+        {
+          event: "*",
+          schema: "public",
+          table: "pratos_do_dia",
+          filter: `lanchonete_id=eq.${lanchonete.id}`,
+        },
         () => recarregar()
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "reservas" },
+        {
+          event: "*",
+          schema: "public",
+          table: "reservas",
+          filter: `lanchonete_id=eq.${lanchonete.id}`,
+        },
         () => recarregar()
       )
       .subscribe();
@@ -58,15 +75,15 @@ export function AdminClient({ pratosIniciais, reservasIniciais }: AdminClientPro
     return () => {
       supabase.removeChannel(canal);
     };
-  }, [recarregar]);
+  }, [lanchonete.id, recarregar]);
 
   return (
     <div className="flex flex-col gap-8">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <NovoPratoForm onCriado={recarregar} />
+          <NovoPratoForm lanchoneteId={lanchonete.id} onCriado={recarregar} />
         </div>
-        <QrCodeCard />
+        <QrCodeCard slug={lanchonete.slug} nome={lanchonete.nome} />
       </div>
 
       <section className="flex flex-col gap-3">

@@ -2,8 +2,18 @@ export type TipoEntrega = "retirada" | "comer_no_local";
 
 export type StatusReserva = "pendente" | "confirmada" | "concluida" | "cancelada";
 
+export type Lanchonete = {
+  id: string;
+  nome: string;
+  slug: string;
+  logo_url: string | null;
+  cor_primaria: string;
+  created_at: string;
+};
+
 export type PratoDoDia = {
   id: string;
+  lanchonete_id: string;
   nome: string;
   descricao: string | null;
   preco: number;
@@ -17,6 +27,7 @@ export type PratoDoDia = {
 
 export type Reserva = {
   id: string;
+  lanchonete_id: string;
   prato_id: string;
   cliente_nome: string;
   cliente_telefone: string;

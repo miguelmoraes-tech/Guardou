@@ -7,10 +7,11 @@ import { hojeISO } from "@/lib/format";
 import { Spinner } from "@/components/Spinner";
 
 type NovoPratoFormProps = {
+  lanchoneteId: string;
   onCriado: () => void;
 };
 
-export function NovoPratoForm({ onCriado }: NovoPratoFormProps) {
+export function NovoPratoForm({ lanchoneteId, onCriado }: NovoPratoFormProps) {
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
   const [preco, setPreco] = useState("");
@@ -63,6 +64,7 @@ export function NovoPratoForm({ onCriado }: NovoPratoFormProps) {
       }
 
       const { error } = await supabase.from("pratos_do_dia").insert({
+        lanchonete_id: lanchoneteId,
         nome: nome.trim(),
         descricao: descricao.trim() || null,
         preco: precoNumerico,
